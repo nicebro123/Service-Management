@@ -4,14 +4,17 @@ import psutil
 import signal
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QMessageBox, QVBoxLayout
 from PyQt5.QtCore import QTimer
+import multiprocessing
 
+def run_script(script_path):
+    subprocess.call(['python', script_path])
 
 class ServiceManager(QWidget):
     def __init__(self):
         super().__init__()
 
         # 设置窗口标题和大小
-        self.setWindowTitle('一键启动服务管理器')
+        self.setWindowTitle('维保系统服务')
         self.setGeometry(100, 100, 300, 150)
 
         # 设置背景颜色
@@ -81,19 +84,27 @@ class ServiceManager(QWidget):
         self.processes = []
 
     def start_service(self):
-        # 启动一个新进程并保存进程对象
-        process = subprocess.Popen(['python', 'hello1.py'])
-        self.processes.append(process)
+        # 启动两个新进程并保存进程对象
+        script1 = 'hello1.py'
+        script2 = 'hello2.py'
+
+        p1 = multiprocessing.Process(target=run_script, args=(script1,))
+        p2 = multiprocessing.Process(target=run_script, args=(script2,))
+        p1.start()
+        p2.start()
+
+        self.processes.extend([p1, p2])
 
     def stop_service(self):
         # 实现停止服务逻辑
         for process in self.processes:
-            # 终止进程
             try:
                 process.terminate()
-                process.wait(timeout=5)
+                process.join(timeout=5)
             except subprocess.TimeoutExpired:
                 process.kill()
+            except Exception as e:
+                print('Error stopping process:', process.pid, e)
 
         # 清空进程列表
         self.processes.clear()
@@ -110,13 +121,13 @@ class ServiceManager(QWidget):
             for process in self.processes:
                 try:
                     # 向进程发送 SIGTERM 信号
-                    process.send_signal(signal.SIGTERM)
-                    # 等待进程退出
-                    process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    # 如果在超时时间内进程还没退出，则使用 Popen 对象终止进程
                     process.terminate()
-                    process.wait(timeout=5)
+                    # 等待进程退出
+                    process.join(timeout=5)
+                except subprocess.TimeoutExpired:
+                    # 如果在超时时间内进程还没退出，则使用 terminate() 方法终止进程
+                    process.terminate()
+                    process.join(timeout=5)
                 except ProcessLookupError:
                     pass
 
@@ -132,3 +143,4 @@ if __name__ == '__main__':
 
     # 进入 Qt 事件循环
     sys.exit(app.exec_())
+
